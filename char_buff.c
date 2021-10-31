@@ -43,6 +43,10 @@ static size_t get_initial_capacity() {
     return 2000u;
 }
 
+static bool is_string_from_self(char_buff_t *cb, char *str) {
+    return cb->data <= str && str <= cb->data + cb->length;
+}
+
 
 
 char_buff_t *cb_create_with_capacity(size_t capacity) {
@@ -88,6 +92,23 @@ cb_status_t cb_append(char_buff_t *cb, char *str) {
     if (NULL == cb || NULL == str) return CB_ERROR_NULL_ARGUMENT;
     if ('\0' == str[0]) return CB_SUCCESS;
 
+    // check for appending self
+    if (is_string_from_self(cb, str)) {
+        char_buff_t *cpy = cb_initialize(str);
+        cb_status_t status = cb_append(cb, cpy->data);
+
+        cb_free(cpy);
+        return status;
+    }
+
+    if (is_string_from_self(cb, str)) {
+        char_buff_t *cpy = cb_initialize(str);
+        cb_status_t status = cb_append(cb, cpy->data);
+
+        cb_free(cpy);
+        return status;
+    }
+
     cb_status_t status = CB_SUCCESS;
     char c;
     size_t i = 0;
@@ -104,6 +125,15 @@ cb_status_t cb_append_substr(char_buff_t *cb, char *str, size_t start, size_t le
     if (NULL == cb || NULL == str) return CB_ERROR_NULL_ARGUMENT;
     if ('\0' == str[0]) return CB_SUCCESS;
 
+    // check for appending self
+    if (is_string_from_self(cb, str)) {
+        char_buff_t *cpy = cb_initialize(str);
+        cb_status_t status = cb_append_substr(cb, cpy->data, start, length);
+
+        cb_free(cpy);
+        return status;
+    }
+
     int status = 0;
     char c;
     for (size_t i = start; i - start < length; ++i) {
@@ -117,10 +147,20 @@ cb_status_t cb_append_substr(char_buff_t *cb, char *str, size_t start, size_t le
     return status;
 }
 
-cb_status_t cb_appendf(char_buff_t *cb, char *format, ...) {
-    // initialize variable args list
-    va_list args;
-    va_start(args, format);
+cb_vappendf(char_buff_t *cb, char *format, va_list args) {
+    //check for null arguments
+    if (NULL == cb || NULL == format || NULL == args)
+        return CB_ERROR_NULL_ARGUMENT;
+
+    // check for appending self
+    if (is_string_from_self(cb, format)) {
+        char_buff_t *cpy = cb_initialize(format);
+        cb_status_t status = cb_vappendf(cb, cpy->data, args);
+
+        cb_free(cpy);
+        return status;
+    }
+
     cb_status_t status = CB_SUCCESS;
     char *end;
     size_t char_limit;
@@ -129,22 +169,42 @@ retry:
     end = cb->data + cb->length;
     char_limit = cb->capacity - cb->length;
 
-    int digitCount = vsnprintf(end, char_limit + 1, format, args);
+    int char_count = vsnprintf(end, char_limit + 1, format, args);
 
     // check the result to see if the append was successful.
     // If not: was it an encoding error?
     // if not: was the buffer not big enouph?
     // if so: expand the buffer and try again.
-    if (digitCount < 0) {
+    if (char_count < 0) {
         status = CB_ERROR_ENCODING_ERROR;
     }
-    else if (digitCount > char_limit) {
-        status = resize_extend_only(cb, cb->capacity + digitCount);
+    else if (char_count > char_limit) {
+        // buffer not big enouph so make it big enouph and try again
+
+        // making the buffer twice as big plus digitcount may be a bit much
+        // but it ensures there will be leading space for future appending
+        // and that there will be enouph space for the retry.
+        status = resize_extend_only(cb, cb->capacity * 2 + char_count);
         if (!status)
             goto retry;
     }
+    else {
+        cb->length += char_count;
+    }
+
+    add_terminator(cb);
+    return status;
+}
+
+cb_status_t cb_appendf(char_buff_t *cb, char *format, ...) {
+    // initialize variable args list
+    va_list args;
+    va_start(args, format);
+
+    cb_status_t status = cb_vappendf(cb, format, args);
     
     va_end(args);
+    add_terminator(cb);
     return status;
 }
 
@@ -209,12 +269,10 @@ char *cb_export(char_buff_t *cb) {
     if (NULL == cb) return NULL;
 
     char *result = (char *)malloc(sizeof(char) * (cb->length + 1));
-    if (NULL == result) return NULL;
+    if (NULL == result)
+        return CB_ERROR_MALLOC_FAILURE;
 
-    for (int i = 0; i < cb->length; ++i)
-        result[i] = cb->data[i];
-
-    result[cb->length] = '\0';
+    strncpy_s(result, cb->length + 1, cb->data, cb->length + 1);
 
     return result;
 }

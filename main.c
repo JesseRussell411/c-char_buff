@@ -3,34 +3,23 @@
 #include "char_buff.h"
 
 int main() {
-	/*char_buff_t *test = cb_create();
-	printf("%i", test->capacity);
+	for (;;) {
+		char_buff_t *test = cb_create();
 
-	cb_append(test, "abcd");
-	cb_append(test, "\nHello World!");
-	cb_append(test, "\nAll work and no play makes jack a dull boy.");
-	cb_append(test, "\n");
+		cb_append(test, "%i, %s");
+		cb_appendf(test, test->data, 5, "mad capn toooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooom");
+		char_buff_t *clone = cb_create();
+		cb_append(clone, cb_export(test));
 
-	for (int i = 0; i < 100; ++i)
-		cb_append(test, "All work and no play makes jack a dull boy.\n");
-
-	cb_println(test);
-
-	printf("%i", test->capacity);
-	cb_free(test);*/
-	char_buff_t *test = cb_create();
-	for (int i = 0; i < 1996; ++i)
-		cb_append_char(test,'f');
-	cb_append_char(test, ':');
-
-	printf("%i\n", test->capacity);
-
-	cb_append_int(test, 2000);
-
-
-	printf("%i\n", test->capacity);
-	cb_println(test);
-	cb_free(test);
+		cb_println(test);
+		cb_println(clone);
+		
+		
+		
+		cb_free(clone);
+		cb_free(test);
+		break;
+	}
 
 
 	
