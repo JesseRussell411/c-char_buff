@@ -6,12 +6,12 @@
 #include "char_buff.h"
 
 
-static cb_status_t resize_extend_only(char_buff_t *cb, size_t new_capacity) {
-    char *newData = realloc(cb->data, new_capacity + 1);
+static cb_status_t resize_extend_only(char_buff_t *self, size_t new_capacity) {
+    char *newData = realloc(self->data, new_capacity + 1);
     if (NULL == newData) return CB_ERROR_REALLOC_FAILURE;
 
-    cb->data = newData;
-    cb->capacity = new_capacity;
+    self->data = newData;
+    self->capacity = new_capacity;
     return CB_SUCCESS;
 }
 
@@ -44,7 +44,7 @@ static size_t get_initial_capacity() {
 }
 
 static bool is_string_from_self(char_buff_t *cb, char *str) {
-    return cb->data <= str && str <= cb->data + cb->length;
+    return cb->data <= str && str <= cb->data + cb->capacity;
 }
 
 
@@ -94,11 +94,7 @@ cb_status_t cb_append(char_buff_t *cb, char *str) {
 
     // check for appending self
     if (is_string_from_self(cb, str)) {
-        char_buff_t *cpy = cb_initialize(str);
-        cb_status_t status = cb_append(cb, cpy->data);
-
-        cb_free(cpy);
-        return status;
+        return cb_append_substr(cb, str, 0, cb->length - (str - cb->data));
     }
 
     if (is_string_from_self(cb, str)) {
@@ -124,14 +120,12 @@ cb_status_t cb_append(char_buff_t *cb, char *str) {
 cb_status_t cb_append_substr(char_buff_t *cb, char *str, size_t start, size_t length) {
     if (NULL == cb || NULL == str) return CB_ERROR_NULL_ARGUMENT;
     if ('\0' == str[0]) return CB_SUCCESS;
-
-    // check for appending self
+    // handle appending self
     if (is_string_from_self(cb, str)) {
-        char_buff_t *cpy = cb_initialize(str);
-        cb_status_t status = cb_append_substr(cb, cpy->data, start, length);
+        size_t max_length = cb->length - start;
 
-        cb_free(cpy);
-        return status;
+        if (length > max_length)
+            length = max_length;
     }
 
     int status = 0;
@@ -146,6 +140,7 @@ cb_status_t cb_append_substr(char_buff_t *cb, char *str, size_t start, size_t le
     add_terminator(cb);
     return status;
 }
+
 
 cb_vappendf(char_buff_t *cb, char *format, va_list args) {
     //check for null arguments
@@ -276,7 +271,19 @@ char *cb_export(char_buff_t *cb) {
 
     return result;
 }
-
+char cb_get(char_buff_t *cb, size_t i) {
+    if (0 <= i || i < cb->length)
+        return cb->data[i];
+    else
+        return '\0';
+}
+cb_status_t cb_set(char_buff_t *cb, size_t i, char value) {
+    if (0 <= i || i < cb->length) {
+        cb->data[i] = value;
+        return CB_SUCCESS;
+    }
+    else return CB_ERROR_INDEX_OUT_OF_BOUNDS;
+}
 
 //
 //cb_tokenizer_t cb_tokenize(char_buff_t *cb, const char *delim) {

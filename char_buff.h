@@ -54,4 +54,7 @@ char_buff_t *cb_initialize(char *str);
 
 char_buff_t *cb_clone(char_buff_t *cb);
 
+char cb_get(char_buff_t *cb, size_t i);
+cb_status_t cb_set(char_buff_t *cb, size_t i, char value);
+
 char *cb_export(char_buff_t *cb);
